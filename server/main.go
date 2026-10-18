@@ -23,7 +23,7 @@ func main() {
 		log.Fatalf("start Router watcher: %v", err)
 	}
 
-	server, listener, err := startGRPCServer(*listenAddress, routerMap)
+	server, listener, err := newGRPCServer(*listenAddress, routerMap)
 	if err != nil {
 		log.Fatalf("start gRPC server: %v", err)
 	}

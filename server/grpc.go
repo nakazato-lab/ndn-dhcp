@@ -31,7 +31,7 @@ func (r *routerResolver) GetRouterAddress(_ context.Context, request *dhcppb.Rou
 	}, nil
 }
 
-func startGRPCServer(address string, routerMap *nodeRouterMap) (*grpc.Server, net.Listener, error) {
+func newGRPCServer(address string, routerMap *nodeRouterMap) (*grpc.Server, net.Listener, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, nil, err
