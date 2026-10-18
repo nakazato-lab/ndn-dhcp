@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package ndn.dhcp.v1;
+
+option go_package = "github.com/nakazato-lab/ndn-dhcp/proto;dhcppb";
+
+service RouterResolver {
+  rpc GetRouterAddress(RouterRequest) returns (RouterResponse);
+}
+
+message RouterRequest {
+  string node_name = 1;
+}
+
+message RouterResponse {
+  string router_ip = 1;
+  uint32 port = 2;
+}
