@@ -28,14 +28,16 @@ func startRouterWatcher(ctx context.Context, namespace string) (*nodeRouterMap, 
 		}),
 	)
 	pods := factory.Core().V1().Pods().Informer()
-	update := func() { routerMap.setRouterPods(pods.GetStore().List()) }
+	update := func() { routerMap.setRouterPods(pods.GetStore().List()) } // informer cache
 	pods.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(interface{}) { update() },
 		UpdateFunc: func(interface{}, interface{}) { update() },
 		DeleteFunc: func(interface{}) { update() },
 	})
 
+	// The informer first lists existing app=nfd Pods, then watches matching changes.
 	factory.Start(ctx.Done())
+	// Wait until the initial list from the kube-api server populates the informer's Pod store.
 	if !cache.WaitForCacheSync(ctx.Done(), pods.HasSynced) {
 		return nil, context.Canceled
 	}
