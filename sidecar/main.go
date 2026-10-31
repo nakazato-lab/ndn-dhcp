@@ -17,8 +17,9 @@ type gateway struct {
 }
 
 type routerResponse struct {
-	RouterIP string `json:"routerIP"`
-	Port     uint32 `json:"port"`
+	RouterIP   string `json:"routerIP"`
+	Port       uint32 `json:"port"`
+	RouterName string `json:"routerName"`
 }
 
 func (g *gateway) handleRouterAddress(w http.ResponseWriter, request *http.Request) {
@@ -43,8 +44,9 @@ func (g *gateway) handleRouterAddress(w http.ResponseWriter, request *http.Reque
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(routerResponse{
-		RouterIP: response.GetRouterIp(),
-		Port:     response.GetPort(),
+		RouterIP:   response.GetRouterIp(),
+		Port:       response.GetPort(),
+		RouterName: response.GetRouterName(),
 	})
 }
 

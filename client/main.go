@@ -16,18 +16,22 @@ import (
 
 const dhcpServerURL = "http://ndn-dhcp:8080"
 
-type routerResponse struct {
-	RouterIP string `json:"routerIP"`
-	Port     uint32 `json:"port"`
+type routerInfo struct {
+	RouterIP   string `json:"routerIP"`
+	Port       uint32 `json:"port"`
+	RouterName string `json:"routerName"`
 }
 
-const addressFile = "/etc/ndn-config/ADDRESS"
+const (
+	addressFile    = "/etc/ndn-config/ADDRESS"
+	routerNameFile = "/etc/ndn-config/ROUTER_NAME"
+)
 
-func requestRouterAddress(nodeName string) (string, error) {
+func requestRouterInfo(nodeName string) (routerInfo, error) {
 	serverURL := dhcpServerURL
 	endpoint, err := url.Parse(serverURL)
 	if err != nil {
-		return "", err
+		return routerInfo{}, err
 	}
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/v1/router"
 	query := endpoint.Query()
@@ -36,28 +40,32 @@ func requestRouterAddress(nodeName string) (string, error) {
 
 	response, err := (&http.Client{Timeout: 5 * time.Second}).Get(endpoint.String())
 	if err != nil {
-		return "", err
+		return routerInfo{}, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(response.Body)
-		return "", fmt.Errorf("DHCP Server returned %s: %s", response.Status, strings.TrimSpace(string(body)))
+		return routerInfo{}, fmt.Errorf("DHCP Server returned %s: %s", response.Status, strings.TrimSpace(string(body)))
 	}
-	var result routerResponse
+	var result routerInfo
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		return "", err
+		return routerInfo{}, err
 	}
-	if result.RouterIP == "" || result.Port == 0 {
-		return "", fmt.Errorf("DHCP Server returned an invalid Router endpoint")
+	if result.RouterIP == "" || result.Port == 0 || result.RouterName == "" {
+		return routerInfo{}, fmt.Errorf("DHCP Server returned an invalid Router endpoint")
 	}
-	return net.JoinHostPort(result.RouterIP, fmt.Sprint(result.Port)), nil
+	return result, nil
 }
 
-func registerRouterAddress(path, address string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+func registerRouterInfo(router routerInfo) error {
+	if err := os.MkdirAll(filepath.Dir(addressFile), 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(address+"\n"), 0644)
+	address := net.JoinHostPort(router.RouterIP, fmt.Sprint(router.Port))
+	if err := os.WriteFile(addressFile, []byte(address+"\n"), 0644); err != nil {
+		return err
+	}
+	return os.WriteFile(routerNameFile, []byte(router.RouterName+"\n"), 0644)
 }
 
 func main() {
@@ -69,14 +77,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	address, err := requestRouterAddress(*nodeName)
+	router, err := requestRouterInfo(*nodeName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "request DHCP Server: %v\n", err)
 		os.Exit(1)
 	}
-	if err := registerRouterAddress(addressFile, address); err != nil {
-		fmt.Fprintf(os.Stderr, "write transport: %v\n", err)
+	if err := registerRouterInfo(router); err != nil {
+		fmt.Fprintf(os.Stderr, "write router info: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println(address)
+	fmt.Println(net.JoinHostPort(router.RouterIP, fmt.Sprint(router.Port)))
 }

@@ -15,4 +15,5 @@ message RouterRequest {
 message RouterResponse {
   string router_ip = 1;
   uint32 port = 2;
+  string router_name = 3;
 }
