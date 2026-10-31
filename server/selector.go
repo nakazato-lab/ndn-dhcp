@@ -7,17 +7,25 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const nfdPort uint32 = 6363
+
 type nodeRouterMap struct {
-	mu              sync.RWMutex
-	routerIPsByNode map[string][]string
+	mu                   sync.RWMutex
+	routerEndpointByNode map[string]routerEndpoint
+}
+
+type routerEndpoint struct {
+	ip   string
+	port uint32
+	name string
 }
 
 func newNodeRouterMap() *nodeRouterMap {
-	return &nodeRouterMap{routerIPsByNode: make(map[string][]string)}
+	return &nodeRouterMap{routerEndpointByNode: make(map[string]routerEndpoint)}
 }
 
 func (r *nodeRouterMap) setRouterPods(objects []interface{}) {
-	routerIPsByNode := make(map[string][]string)
+	routerEndpointByNode := make(map[string]routerEndpoint)
 	for _, object := range objects {
 		pod, ok := object.(*corev1.Pod)
 		if !ok || pod.Status.Phase != corev1.PodRunning || pod.Spec.NodeName == "" || pod.Status.PodIP == "" {
@@ -26,28 +34,32 @@ func (r *nodeRouterMap) setRouterPods(objects []interface{}) {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		routerIPsByNode[pod.Spec.NodeName] = append(routerIPsByNode[pod.Spec.NodeName], pod.Status.PodIP)
+		routerEndpointByNode[pod.Spec.NodeName] = routerEndpoint{
+			ip:   pod.Status.PodIP,
+			port: nfdPort,
+			name: pod.Name,
+		}
 	}
 
 	r.mu.Lock()
-	r.routerIPsByNode = routerIPsByNode
+	r.routerEndpointByNode = routerEndpointByNode
 	r.mu.Unlock()
 }
 
-func (r *nodeRouterMap) selectRouter(nodeName string) (string, bool) {
+func (r *nodeRouterMap) selectRouter(nodeName string) (routerEndpoint, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if local := r.routerIPsByNode[nodeName]; len(local) > 0 {
-		return local[0], true
+	if local, found := r.routerEndpointByNode[nodeName]; found {
+		return local, true
 	}
-	// Collect Router IPs from every other Node and select one at random.
-	var remote []string
-	for _, routers := range r.routerIPsByNode {
-		remote = append(remote, routers...)
+	// Collect Router endpoints from every other Node and select one at random.
+	var remote []routerEndpoint
+	for _, router := range r.routerEndpointByNode {
+		remote = append(remote, router)
 	}
 	if len(remote) == 0 {
-		return "", false
+		return routerEndpoint{}, false
 	}
 	return remote[rand.IntN(len(remote))], true
 }

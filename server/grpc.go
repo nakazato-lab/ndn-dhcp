@@ -10,8 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const nfdPort = 6363
-
 type routerResolver struct {
 	dhcppb.UnimplementedRouterResolverServer
 	routerMap *nodeRouterMap
@@ -26,8 +24,9 @@ func (r *routerResolver) GetRouterAddress(_ context.Context, request *dhcppb.Rou
 		return nil, status.Error(codes.Unavailable, "no NDN Router is available")
 	}
 	return &dhcppb.RouterResponse{
-		RouterIp: router,
-		Port:     nfdPort,
+		RouterIp:   router.ip,
+		Port:       router.port,
+		RouterName: router.name,
 	}, nil
 }
 
